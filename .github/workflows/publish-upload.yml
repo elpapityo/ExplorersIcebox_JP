@@ -115,7 +115,7 @@ jobs:
           version = os.environ['VERSION']
           assembly = f'{version}.0'
           url = f'https://github.com/elpapityo/ExplorersIcebox_JP/releases/download/V{version}/ExplorersIceboxJP_v{version}.zip'
-          icon = f'https://raw.githubusercontent.com/elpapityo/ExplorersIceboxJP/main/images/icon.png?v={version}'
+          icon = f'https://raw.githubusercontent.com/elpapityo/ExplorersIcebox_JP/master/images/icon.png?v={version}'
 
           path = Path('pluginmaster.json')
           data = json.loads(path.read_text(encoding='utf-8-sig'))
