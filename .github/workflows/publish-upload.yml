@@ -1,0 +1,163 @@
+name: Publish ExplorersIceboxJP upload
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - "upload/ExplorersIceboxJP_v*.zip"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Select uploaded package
+        id: pkg
+        shell: bash
+        run: |
+          ZIP=""
+          if [ "${{ github.event_name }}" = "push" ]; then
+            ZIP=$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -E '^upload/ExplorersIceboxJP_v[0-9]+(\.[0-9]+)+\.zip$' | head -n 1 || true)
+          fi
+          if [ -z "$ZIP" ]; then
+            ZIP=$(find upload -maxdepth 1 -type f -name 'ExplorersIceboxJP_v*.zip' | sort -V | tail -n 1 || true)
+          fi
+          if [ -z "$ZIP" ]; then
+            echo "No upload ZIP found."
+            exit 1
+          fi
+          FILE=$(basename "$ZIP")
+          VERSION=${FILE#ExplorersIceboxJP_v}
+          VERSION=${VERSION%.zip}
+          TAG="V${VERSION}"
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Verify package and version
+        shell: bash
+        env:
+          ZIP: ${{ steps.pkg.outputs.zip }}
+          VERSION: ${{ steps.pkg.outputs.version }}
+        run: |
+          set -euo pipefail
+          test -s "$ZIP"
+          python3 - <<'PY2'
+          import json, os, zipfile
+
+          zip_path = os.environ['ZIP']
+          version = os.environ['VERSION']
+
+          with zipfile.ZipFile(zip_path) as z:
+              names = z.namelist()
+              normalized = {name.replace('\\', '/'): name for name in names}
+              required = ['ExplorersIceboxJP.dll', 'ExplorersIceboxJP.json', 'images/icon.png']
+              missing = [name for name in required if name not in normalized]
+              if missing:
+                  raise SystemExit(f'Missing required files: {missing}')
+
+              manifest = json.loads(z.read(normalized['ExplorersIceboxJP.json']).decode('utf-8-sig'))
+              expected = version + '.0'
+              actual = manifest.get('AssemblyVersion')
+              if actual != expected:
+                  raise SystemExit(f'AssemblyVersion mismatch: ZIP={actual!r}, filename={expected!r}')
+              if manifest.get('InternalName') != 'ExplorersIceboxJP':
+                  raise SystemExit(f"InternalName mismatch: {manifest.get('InternalName')!r}")
+
+              os.makedirs('images', exist_ok=True)
+              with open('images/icon.png', 'wb') as out:
+                  out.write(z.read(normalized['images/icon.png']))
+
+          print(f'Verified AssemblyVersion: {actual}')
+          print('Verified InternalName: ExplorersIceboxJP')
+          print('Verified and extracted images/icon.png')
+
+          # ZIP entry names must use forward slashes for Dalamud package paths.
+          import tempfile, shutil
+          tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
+          tmp.close()
+          with zipfile.ZipFile(zip_path, 'r') as src, zipfile.ZipFile(tmp.name, 'w') as dst:
+              seen = set()
+              for info in src.infolist():
+                  fixed = info.filename.replace('\\', '/')
+                  if fixed in seen:
+                      raise SystemExit(f'Duplicate ZIP entry after path normalization: {fixed}')
+                  seen.add(fixed)
+                  data = src.read(info.filename)
+                  new_info = zipfile.ZipInfo(fixed, date_time=info.date_time)
+                  new_info.compress_type = zipfile.ZIP_DEFLATED
+                  new_info.external_attr = info.external_attr
+                  new_info.comment = info.comment
+                  dst.writestr(new_info, data)
+          shutil.move(tmp.name, zip_path)
+          print('Normalized ZIP entry paths to forward slashes')
+          PY2
+
+      - name: Sync pluginmaster and version
+        shell: bash
+        env:
+          VERSION: ${{ steps.pkg.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY2'
+          import json, os
+          from pathlib import Path
+
+          version = os.environ['VERSION']
+          assembly = f'{version}.0'
+          url = f'https://github.com/elpapityo/ExplorersIcebox_JP/releases/download/V{version}/ExplorersIceboxJP_v{version}.zip'
+          icon = f'https://raw.githubusercontent.com/elpapityo/ExplorersIceboxJP/main/images/icon.png?v={version}'
+
+          path = Path('pluginmaster.json')
+          data = json.loads(path.read_text(encoding='utf-8-sig'))
+          if not isinstance(data, list) or not data:
+              raise SystemExit('pluginmaster.json must contain a non-empty JSON array')
+          entry = data[0]
+          entry['InternalName'] = 'ExplorersIceboxJP'
+          entry['AssemblyVersion'] = assembly
+          entry['DownloadLinkInstall'] = url
+          entry['DownloadLinkUpdate'] = url
+          entry['DownloadLinkTesting'] = url
+          entry['IconUrl'] = icon
+          path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          Path('VERSION.txt').write_text(version + '\n', encoding='utf-8')
+          print(f'Synced metadata -> ExplorersIceboxJP {assembly}')
+          PY2
+
+      - name: Commit synchronized files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pluginmaster.json VERSION.txt images/icon.png
+          if ! git diff --cached --quiet; then
+            git commit -m "Sync ExplorersIceboxJP release files"
+            git push
+          else
+            echo "Release metadata already synchronized."
+          fi
+
+      - name: Create or replace release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          TAG="${{ steps.pkg.outputs.tag }}"
+          ZIP="${{ steps.pkg.outputs.zip }}"
+          VERSION="${{ steps.pkg.outputs.version }}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ZIP" --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "ExplorersIceboxJP v${VERSION}" --notes-file CHANGELOG.md
+          else
+            gh release create "$TAG" "$ZIP" --repo "$GITHUB_REPOSITORY" --title "ExplorersIceboxJP v${VERSION}" --notes-file CHANGELOG.md
+          fi

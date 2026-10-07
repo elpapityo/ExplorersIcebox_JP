@@ -1,8 +1,0 @@
-// things I want to do post update (Thanks @Croizat for the actual ideas)
-
-// Add a feature to buy cordials based on amount of cowries earned (moreso top priority)
-// "Shopping List" or moreso setting an amount of items you want to gather from each loop, that way it can calculate how many to do.
-// Improve routing to the sections
-  // By this i mean use navmesh entirely instead of relying on visland for waypoints
-  // to the same degree, add a flying version for each of the routes
-// Need to check to see if you can check if flying is unlocked or not... 

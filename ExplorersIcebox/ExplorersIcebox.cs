@@ -1,4 +1,4 @@
-using ECommons.Automation.NeoTaskManager;
+﻿using ECommons.Automation.NeoTaskManager;
 using ECommons.Logging;
 using ExplorersIcebox.Config;
 using ExplorersIcebox.IPC;
@@ -34,7 +34,24 @@ public sealed class ExplorersIcebox : IDalamudPlugin
     public ExplorersIcebox(IDalamudPluginInterface pi)
     {
         P = this;
+
         ECommonsMain.Init(pi, P, Module.DalamudReflector, Module.ObjectFunctions, Module.SplatoonAPI);
+
+        // Icon deployment diagnostic. PluginLog is only safe after ECommonsMain.Init.
+        try
+        {
+            var dllPath = typeof(ExplorersIcebox).Assembly.Location;
+            var dllDir = System.IO.Path.GetDirectoryName(dllPath) ?? string.Empty;
+            var devIconPath = System.IO.Path.Combine(dllDir, "images", "icon.png");
+            var namedIconPath = System.IO.Path.Combine(dllDir, "ExplorersIceboxJP.png");
+            PluginLog.Information($"[Icon] DLL={dllPath}");
+            PluginLog.Information($"[Icon] images\\icon.png exists={System.IO.File.Exists(devIconPath)} path={devIconPath}");
+            PluginLog.Information($"[Icon] ExplorersIceboxJP.png exists={System.IO.File.Exists(namedIconPath)} path={namedIconPath}");
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Warning($"[Icon] Failed to verify deployed icon files: {ex.Message}");
+        }
         File_Migration.UpdateItemConfig();
 
         PctService.Initialize(pi);
@@ -60,12 +77,12 @@ public sealed class ExplorersIcebox : IDalamudPlugin
 
         };
         */
-        EzCmd.Add("/explorersicebox", OnCommand, """
-                                                 Open plugin interface
-                                                 /icebox - alias for /explorersicebox
-                                                 /explorersicebox s|settings - Opens the workshop menu
+        EzCmd.Add("/explorersiceboxjp", OnCommand, """
+                                                 プラグイン画面を開きます
+                                                 /iceboxjp - /explorersiceboxjp の短縮コマンド
+                                                 /explorersiceboxjp s|settings - 設定画面を開きます
                                                  """);
-        EzCmd.Add("/icebox", OnCommand);
+        EzCmd.Add("/iceboxjp", OnCommand);
 
         taskManager = new(new(abortOnTimeout: true, timeLimitMS: 20000, showDebug: true));
 
@@ -73,7 +90,7 @@ public sealed class ExplorersIcebox : IDalamudPlugin
         Svc.Framework.Update += Tick;
         OnPluginLoad.UpdateItemNames();
     }
-    public string Name => "ExplorersIcebox";
+    public string Name => "ExplorersIceboxJP";
 
     // Lazy-loaded static config accessor
     public static GeneralConfig C => Config ??= LoadConfig<GeneralConfig>();
@@ -83,6 +100,8 @@ public sealed class ExplorersIcebox : IDalamudPlugin
 
     public void Dispose()
     {
+        PastureAutomation.Dispose();
+        FarmAutomation.Dispose();
         Safe(() => Svc.Framework.Update -= Tick);
         Safe(() => Svc.PluginInterface.UiBuilder.Draw -= windowSystem.Draw);
         ECommonsMain.Dispose();

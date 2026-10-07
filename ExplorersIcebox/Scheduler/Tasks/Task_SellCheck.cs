@@ -1,4 +1,4 @@
-using ExplorersIcebox.Enums;
+﻿using ExplorersIcebox.Enums;
 using ExplorersIcebox.Util;
 namespace ExplorersIcebox.Scheduler.Tasks;
 
@@ -34,7 +34,7 @@ internal static class Task_SellCheck
             var gatherAmount = IslandHelper.RouteItems[itemName].Amount;
             var itemId = item.Value.ItemId;
 
-            var ItemSell = IslandHelper.SellAmount(LoopCount, gatherAmount, itemId);
+            var ItemSell = IslandHelper.SellAmount(LoopCount, gatherAmount, itemId, itemName);
             if (ItemSell > 0)
             {
                 IslandHelper.SellItems.Add(itemId, ItemSell);

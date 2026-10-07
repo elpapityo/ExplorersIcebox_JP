@@ -2,18 +2,23 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
 
     <PropertyGroup>
-        <Version>1.1.0.3</Version>
-        <Description>Pop open a cold one while the tedious parts of exploration is handled by your good friend cousin robby.</Description>
-        <PackageProjectUrl>https://github.com/goatcorp/ExplorersIcebox</PackageProjectUrl>
+        <Version>0.1.1</Version>
+        <Description>ExplorersIceboxJP 日本語化カスタム版</Description>
+        <PackageProjectUrl>https://github.com/LeontopodiumNivale14/Explorers-Icebox</PackageProjectUrl>
         <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
         <IsPackable>true</IsPackable>
         <RootNamespace>ExplorersIcebox</RootNamespace>
+        <AssemblyName>ExplorersIceboxJP</AssemblyName>
         <TargetFramework>net10.0-windows8.0</TargetFramework>
         <NoWarn>CS8618; CS8625; CS8629;</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
-        <Content Include="ExplorersIcebox.json"/>
+        <Content Include="ExplorersIceboxJP.json" CopyToOutputDirectory="PreserveNewest" />
+        <!-- Dalamud dev plugin icon: keep images\icon.png beside the built DLL. -->
+        <Content Include="..\images\icon.png" Link="images\icon.png" CopyToOutputDirectory="PreserveNewest" />
+        <!-- Named copy used by our common local/release icon layout. -->
+        <Content Include="..\assets\ExplorersIceboxJP.png" Link="ExplorersIceboxJP.png" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
     <ItemGroup>

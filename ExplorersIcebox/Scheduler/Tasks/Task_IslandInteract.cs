@@ -49,23 +49,16 @@ internal static class Task_IslandInteract
 
     internal static bool? GatherInteract(ulong gameObjectId)
     {
-        // Actual interaction itself
-        // If a target exist and can be interacted with, will do so. Probably should add a safety distance check to this for users...
-
         IGameObject? gameObject = null;
         Utils.TryGetObjectByGameObjectId(gameObjectId, out gameObject);
 
         if (gameObject == null || !gameObject.IsTargetable)
-        {
-            // no object was found, exiting code and continuing route
             return true;
-        }
+
         if (!Svc.Condition[ConditionFlag.OccupiedInQuestEvent])
         {
             if (EzThrottler.Throttle("Interacting with Island Object"))
-            {
                 Utils.InteractWithObject(gameObject);
-            }
         }
 
         return false;

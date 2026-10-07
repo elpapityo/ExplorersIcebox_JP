@@ -6,17 +6,25 @@ namespace ExplorersIcebox.Scheduler.Tasks;
 
 internal static class Task_ReturnToBase
 {
-    public static void Enqueue()
+    public static void Enqueue(bool continueWorkflow = true)
     {
-        P.taskManager.Enqueue(() => TeleportCheck(), "Returning to base");
+        P.taskManager.Enqueue(() => TeleportCheck(continueWorkflow), continueWorkflow ? "Returning to base" : "Return to base only");
     }
 
-    internal static unsafe bool? TeleportCheck()
+    internal static unsafe bool? TeleportCheck(bool continueWorkflow = true)
     {
         if (Player.DistanceTo(new Vector3(-268, 40, 226)) < 5)
         {
-            Svc.Log.Debug("Teleport has completed, moving onto check sell");
-            SchedulerMain.State = IceBoxState.CheckSell;
+            if (continueWorkflow)
+            {
+                Svc.Log.Debug("Teleport has completed, moving onto check sell");
+                SchedulerMain.State = IceBoxState.CheckSell;
+            }
+            else
+            {
+                Svc.Log.Information("Standalone return to base completed");
+                SchedulerMain.State = IceBoxState.Idle;
+            }
             return true;
         }
         if (!Player.IsBusy)

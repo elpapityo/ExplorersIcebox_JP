@@ -103,7 +103,9 @@ public static unsafe class MovementHelper
     public static bool IsSwimming => Svc.Condition[ConditionFlag.Swimming];
 
     /// <summary>
-    ///     Attempts to dive. Dismounts first if mounted on water.
+    ///     Attempts to dive. If mounted on water, the upstream dive + dismount
+    ///     sequence is preserved. If already swimming and unmounted, do not send
+    ///     a dismount action because that action is invalid in this state.
     ///     Returns true if the dive action was fired.
     /// </summary>
     public static bool TryDive()
@@ -111,10 +113,16 @@ public static unsafe class MovementHelper
         if (IsDiving)
             return false;
 
-        if (IsSwimming || IsPlayerMounted)
+        if (IsPlayerMounted)
         {
             ExecuteDive();
             Dismount();
+            return true;
+        }
+
+        if (IsSwimming)
+        {
+            ExecuteDive();
             return true;
         }
 

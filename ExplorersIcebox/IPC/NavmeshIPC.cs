@@ -1,6 +1,7 @@
-using ECommons.EzIpcManager;
+﻿using ECommons.EzIpcManager;
 using ExplorersIcebox.Util;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 namespace ExplorersIcebox.IPC;
 
 #nullable disable
@@ -16,7 +17,7 @@ public class NavmeshIPC
     [EzIPC("Path.%m")] public readonly Action<List<Vector3>, bool> MoveTo;
 
     [EzIPC("Query.Mesh.%m")] public readonly Func<Vector3, float, float, Vector3?> NearestPoint;
-    [EzIPC("Nav.%m")] public readonly Func<Vector3, Vector3, bool, Vector3> Pathfind;
+    [EzIPC("Nav.%m")] public readonly Func<Vector3, Vector3, bool, Task<List<Vector3>>> Pathfind;
 
     [EzIPC("SimpleMove.%m")] public readonly Func<Vector3, bool, bool> PathfindAndMoveTo;
     [EzIPC("SimpleMove.%m")] public readonly Func<bool> PathfindInProgress;

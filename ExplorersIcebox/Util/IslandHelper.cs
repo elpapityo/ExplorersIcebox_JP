@@ -1,4 +1,4 @@
-using ECommons.Logging;
+﻿using ECommons.Logging;
 using ExplorersIcebox.Util.PathCreation;
 using System.Collections.Generic;
 namespace ExplorersIcebox.Util;
@@ -8,6 +8,8 @@ public static class IslandHelper
     public static int GoalLoopAmount;
     public static int MaxRouteLoops = 999;
     public static int LoopCounter = 0;
+    public static int CurrentRouteLoop = 0;
+    public static int CurrentRouteLoopTotal = 0;
     public static KeyValuePair<string, RouteClass.RouteUtil> CurrentRoute;
     public static Dictionary<int, int> SellItems = new();
 
@@ -24,19 +26,23 @@ public static class IslandHelper
     /// </summary>
     /// <param name="loopAmountGathered"></param>
     /// <returns> [Int] Max Loop Amount</returns>
-    public static int IslandLoopCalc(int loopAmountGathered)
+    public static int GetKeepAmount(string itemName)
+    {
+        if (C.ItemKeepAmount != null && C.ItemKeepAmount.TryGetValue(itemName, out var configured))
+            return Math.Clamp(configured, 0, 999);
+
+        return Math.Clamp(C.MinimumItemKeep, 0, 999);
+    }
+
+    public static int IslandLoopCalc(int loopAmountGathered, string itemName)
     {
         if (loopAmountGathered == 0)
             return 0; // safety to make sure that the amount gathered per loop isn't an invalid number
 
-        var MaxLoops = 0;                    // Initial start of the maximum amount of loops you can do
-        var MinItemKeep = C.MinimumItemKeep; // Minimum amount of items you want to keep (global)
-        var MaxAmount = 999;                 // Maximum amount of items that you can gather
-
-        var ItemCap = MaxAmount - MinItemKeep;   // 999 - 500 for example, which would make the max gatherable items 499
-        MaxLoops = ItemCap / loopAmountGathered; // 499 / 6 for example. 
-
-        return MaxLoops;
+        var maxAmount = 999;
+        var keepAmount = GetKeepAmount(itemName);
+        var itemCap = maxAmount - keepAmount;
+        return itemCap / loopAmountGathered;
     }
 
     /// <summary>
@@ -47,9 +53,9 @@ public static class IslandHelper
     /// <returns> [Int] Minimum Amount of Loops </returns>
     public static int MinimumLoopCalc(int amountWanted, int loopAmountGathered) => (amountWanted + loopAmountGathered - 1) / loopAmountGathered;
 
-    public static int SellAmount(int loopAmount, int amountGathered, int itemId)
+    public static int SellAmount(int loopAmount, int amountGathered, int itemId, string itemName)
     {
-        var keepAmount = C.MinimumItemKeep;
+        var keepAmount = GetKeepAmount(itemName);
         var itemSell = 0;
 
         if (PlayerHelper.GetItemCount(itemId, out var currentCount))
@@ -131,7 +137,7 @@ public static class IslandHelper
             var AmountWanted = C.ItemGatherAmount[itemName];
 
             GoalLoopAmount = Math.Max(GoalLoopAmount, MinimumLoopCalc(AmountWanted, gathered.Amount)); // 200 Loops
-            MaxRouteLoops = Math.Min(MaxRouteLoops, IslandLoopCalc(gathered.Amount));                  // 65
+            MaxRouteLoops = Math.Min(MaxRouteLoops, IslandLoopCalc(gathered.Amount, itemName));                  // 65
         }
     }
 
@@ -150,7 +156,7 @@ public static class IslandHelper
             var AmountWanted = C.ItemGatherAmount[itemName];
 
             GoalLoopAmount = Math.Max(GoalLoopAmount, MinimumLoopCalc(AmountWanted, gathered.Amount));
-            MaxRouteLoops = Math.Min(MaxRouteLoops, IslandLoopCalc(gathered.Amount));
+            MaxRouteLoops = Math.Min(MaxRouteLoops, IslandLoopCalc(gathered.Amount, itemName));
         }
     }
 

@@ -1,4 +1,4 @@
-using Dalamud.Interface.Colors;
+﻿using Dalamud.Interface.Colors;
 using ECommons.GameHelpers;
 using ECommons.SplatoonAPI;
 using FFXIVClientStructs.FFXIV.Client.System.Framework;
@@ -56,6 +56,19 @@ public class SplatoonManager
         }
     }
 
+    public static void RenderMarker(Vector3 position, string label, uint color, float radius = 0.35f)
+    {
+        if (!Splatoon.IsConnected()) return;
+        var point = GetNextPoint(label);
+        point.SetRefCoord(position);
+        point.radius = radius;
+        point.thicc = 5f;
+        point.color = color;
+        point.overlayText = label;
+        point.overlayVOffset = 1f;
+        Splatoon.DisplayOnce(point);
+    }
+
     public static Element GetNextLine()
     {
         ResetOnFrameChange();
@@ -97,6 +110,8 @@ public class SplatoonManager
             };
             Cache.WaymarkPointCache.Add(ret);
         }
+        // Cached elements are reused every frame; refresh the label every time.
+        ret.overlayText = overlay;
         Cache.WaymarkPointPos++;
         return ret;
     }

@@ -1,4 +1,4 @@
-using ECommons.Throttlers;
+﻿using ECommons.Throttlers;
 using ExplorersIcebox.Enums;
 using ExplorersIcebox.Util;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
@@ -27,6 +27,7 @@ internal static class Task_SellItems
     // Item we last confirmed via the shipping callback; cleared when all shipping UI is closed.
     private static int LastShippedItemId;
     private static bool sellPipelineActive;
+    private static bool finishToIdleAfterSell;
     private static long lastShipmentCompleteTick;
 
     internal static void Reset()
@@ -34,14 +35,16 @@ internal static class Task_SellItems
         sellPipelineActive = false;
         LastShippedItemId = 0;
         lastShipmentCompleteTick = 0;
+        finishToIdleAfterSell = false;
     }
 
-    public static void Enqueue()
+    public static void Enqueue(bool returnToIdleAfterSell = false)
     {
         if (sellPipelineActive)
             return;
 
         sellPipelineActive = true;
+        finishToIdleAfterSell = returnToIdleAfterSell;
         LastShippedItemId = 0;
         lastShipmentCompleteTick = 0;
         var baseDict = EmbedRoutes.BaseRoutes["Base -> Shopkeep"];
@@ -231,7 +234,8 @@ internal static class Task_SellItems
         {
             Svc.Log.Information("Leave NPC will complete after this");
             sellPipelineActive = false;
-            SchedulerMain.State = IceBoxState.RunRoute;
+            SchedulerMain.State = finishToIdleAfterSell ? IceBoxState.Idle : IceBoxState.RunRoute;
+            finishToIdleAfterSell = false;
             return true;
         }
 
