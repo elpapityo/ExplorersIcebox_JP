@@ -16,7 +16,7 @@
     ],
     "DalamudApiLevel": 15,
     "LoadPriority": 0,
-    "IconUrl": "https://raw.githubusercontent.com/elpapityo/ExplorersIceboxJP/main/images/icon.png?v=0.1.1",
+    "IconUrl": "https://raw.githubusercontent.com/elpapityo/ExplorersIcebox_JP/master/images/icon.png?v=0.1.1",
     "ImageUrls": [],
     "DownloadLinkInstall": "https://github.com/elpapityo/ExplorersIcebox_JP/releases/download/V0.1.1/ExplorersIceboxJP_v0.1.1.zip",
     "DownloadLinkUpdate": "https://github.com/elpapityo/ExplorersIcebox_JP/releases/download/V0.1.1/ExplorersIceboxJP_v0.1.1.zip",
