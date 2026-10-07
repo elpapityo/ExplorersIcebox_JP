@@ -4,7 +4,7 @@
     "Name": "ExplorersIceboxJP",
     "AssemblyVersion": "0.1.1.0",
     "RepoUrl": "https://github.com/elpapityo/ExplorersIcebox_JP",
-    "IconUrl": "https://raw.githubusercontent.com/elpapityo/ExplorersIceboxJP/main/images/icon.png?v=0.1.1",
+    "IconUrl": "https://raw.githubusercontent.com/elpapityo/ExplorersIcebox_JP/master/images/icon.png?v=0.1.1",
     "Punchline": "無人島開拓のレベル上げ・素材収集を自動化します。",
     "Description": "無人島開拓でのレベル上げや素材収集を支援する日本語化カスタム版です。vnavmesh と Lifestream が必要です。",
     "ApplicableVersion": "any",
