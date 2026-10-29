@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   build:
@@ -135,3 +136,12 @@ jobs:
           }
           git commit -m "Add ExplorersIceboxJP v$version distribution package"
           git push
+
+
+      - name: Publish package through existing release workflow
+        if: github.ref == 'refs/heads/master'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run publish-upload.yml --ref master
