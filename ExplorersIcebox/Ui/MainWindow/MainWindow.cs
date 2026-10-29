@@ -1348,10 +1348,14 @@ internal class MainWindow : Window
                 ImGui.TableNextColumn();
                 ImGui.TextUnformatted(slot.UnderCare ? "マメット管理" : "プラグイン対象");
                 ImGui.TableNextColumn();
-                var needsWater = slot.SeedType != 0 && !slot.UnderCare && slot.YieldAvailable == 0 && slot.WaterLevel <= C.FarmWaterLevelThreshold;
+                var harvestReady = FarmAutomation.IsHarvestReady(slot);
+                var needsWater = slot.SeedType != 0
+                    && !slot.UnderCare
+                    && !harvestReady
+                    && slot.WaterLevel <= C.FarmWaterLevelThreshold;
                 if (slot.UnderCare)
                     ImGui.TextUnformatted("対象外");
-                else if (slot.YieldAvailable > 0)
+                else if (harvestReady)
                     ImGui.TextUnformatted("収穫可能");
                 else
                     ImGui.TextUnformatted(needsWater ? "水やり対象" : "対象外");
