@@ -3,7 +3,7 @@ setlocal EnableExtensions
 cd /d "%~dp0"
 
 set "PLUGIN=ExplorersIceboxJP"
-set "VERSION=0.1.3"
+set "VERSION=0.1.4"
 set "CONFIG=Release"
 set "OUTDIR=%~dp0ExplorersIcebox\bin\x64\%CONFIG%"
 set "SOURCEMANIFEST=%~dp0ExplorersIcebox\ExplorersIceboxJP.json"
