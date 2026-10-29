@@ -1,11 +1,11 @@
-# ExplorersIceboxJP v0.1.1
+# ExplorersIceboxJP v0.1.2
 
 ## 改変版・ライセンス表記
 
 - Original project: **Explorers-Icebox** by **Ice / LeontopodiumNivale14**
 - Modified version: **ExplorersIceboxJP**
 - Modified by: **Elpa**
-- Modification date for this release: **2026-10-07**
+- Modification date for this release: **2026-10-30**
 - License: **GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)**
 
 本プロジェクトは Explorers-Icebox を改変した派生版であり、元プロジェクトと同じ AGPL-3.0-or-later の条件で公開します。
