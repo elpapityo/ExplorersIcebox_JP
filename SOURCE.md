@@ -1,8 +1,8 @@
 # Corresponding Source
 
-ExplorersIceboxJP v0.1.2 is distributed under AGPL-3.0-or-later.
+ExplorersIceboxJP v0.1.3 is distributed under AGPL-3.0-or-later.
 
-The corresponding source code for this modified version is the full ExplorersIceboxJP v0.1.2 source tree, including the build script and project files.
+The corresponding source code for this modified version is the full ExplorersIceboxJP v0.1.3 source tree, including the build script and project files.
 When the compiled plugin package is published, the matching source code is made available through the same public project repository at no additional charge.
 
 Public source repository:
