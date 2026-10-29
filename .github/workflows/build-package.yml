@@ -35,6 +35,21 @@ jobs:
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "Version: $version"
 
+      - name: Install Dalamud dev assemblies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $zip = Join-Path $env:RUNNER_TEMP "dalamud-latest.zip"
+          $dir = Join-Path $env:RUNNER_TEMP "dalamud-dev"
+          Invoke-WebRequest -Uri "https://goatcorp.github.io/dalamud-distrib/latest.zip" -OutFile $zip
+          if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          if (-not (Test-Path (Join-Path $dir "Dalamud.dll"))) {
+            throw "Dalamud.dll was not found after extracting latest.zip"
+          }
+          "DALAMUD_HOME=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "Dalamud dev assemblies: $dir"
+
       - name: Restore
         shell: pwsh
         run: dotnet restore ExplorersIcebox.sln
