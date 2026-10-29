@@ -4,7 +4,7 @@
     "Name": "ExplorersIceboxJP",
     "Punchline": "無人島開拓のレベル上げ・素材収集を自動化します。",
     "Description": "無人島開拓でのレベル上げや素材収集を支援する日本語化カスタム版です。vnavmesh と Lifestream が必要です。",
-    "Changelog": "v0.1.2: 畑に収穫→種まき機能を追加。ゲーム側で選択中の種を使用し、対象区画をSlot順に処理します。",
+    "Changelog": "v0.1.2: 畑に収穫のみ／収穫→種まき機能を追加。ゲーム側で選択中の種を使用し、対象区画をSlot順に処理します。",
     "InternalName": "ExplorersIceboxJP",
     "AssemblyVersion": "0.1.2.0",
     "RepoUrl": "https://github.com/elpapityo/ExplorersIcebox_JP",
