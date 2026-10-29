@@ -694,11 +694,11 @@ internal static unsafe class FarmAutomation
             {
                 lastMoveRequest = Environment.TickCount64;
                 P.navmesh.PathfindAndMoveTo(obj.Position, false);
-                PluginLog.Information($"[Farm] Slot={current.SlotId} 種まき前に再接近 Dist={distance:F1}");
+                PluginLog.Information($"[Farm] Slot={slot.SlotId} 収穫前に再接近 Dist={distance:F1}");
             }
 
             if (Environment.TickCount64 - stepStarted > 30000)
-                Stop($"Slot {current.SlotId} の種まき位置への移動が30秒を超えたため停止しました。");
+                Stop($"Slot {slot.SlotId} の収穫位置への移動が30秒を超えたため停止しました。");
             return;
         }
 
@@ -794,12 +794,23 @@ internal static unsafe class FarmAutomation
             return;
         }
 
-        if (Vector3.Distance(Svc.Objects.LocalPlayer!.Position, obj.Position) > 3.6f)
+        var distance = Vector3.Distance(Svc.Objects.LocalPlayer!.Position, obj.Position);
+        if (distance > 3.6f)
         {
-            runStep = RunStep.MoveToPlot;
-            stepStarted = Environment.TickCount64;
+            if (!P.navmesh.IsRunning() && !P.navmesh.PathfindInProgress() && Environment.TickCount64 - lastMoveRequest >= 750)
+            {
+                lastMoveRequest = Environment.TickCount64;
+                P.navmesh.PathfindAndMoveTo(obj.Position, false);
+                PluginLog.Information($"[Farm] Slot={current.SlotId} 種まき前に再接近 Dist={distance:F1}");
+            }
+
+            if (Environment.TickCount64 - stepStarted > 30000)
+                Stop($"Slot {current.SlotId} の種まき位置への移動が30秒を超えたため停止しました。");
             return;
         }
+
+        if (P.navmesh.IsRunning())
+            P.navmesh.Stop();
 
         Utils.TargetgameObject(obj);
         Utils.InteractWithObject(obj);
