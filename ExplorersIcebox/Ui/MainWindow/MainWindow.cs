@@ -1227,7 +1227,7 @@ internal class MainWindow : Window
         ImGui.Separator();
         if (ImGui.CollapsingHeader("使い方・注意事項##FarmHelp"))
         {
-            ImGui.TextWrapped("対象にしたい畑へチェックを入れてから実行してください。水やり、または収穫→種まきを Slot 0 ～ 19 の順番で処理します。");
+            ImGui.TextWrapped("対象にしたい畑へチェックを入れてから実行してください。水やり、収穫のみ、または収穫→種まきを Slot 0 ～ 19 の順番で処理します。");
             ImGui.TextWrapped("ゲーム内の畑番号は1からですが、プラグイン上のSlot番号は0から始まります。");
             ImGui.TextColored(new Vector4(1.00f, 0.72f, 0.20f, 1f), "注意");
             ImGui.SameLine();
@@ -1273,6 +1273,9 @@ internal class MainWindow : Window
                 if (ColoredButton("選択区画の水やりを開始", new(180, 0), new Vector4(0.10f, 0.48f, 0.24f, 1f)))
                     FarmAutomation.StartWatering();
                 ImGui.SameLine();
+                if (ColoredButton("選択区画を収穫", new(150, 0), new Vector4(0.10f, 0.48f, 0.24f, 1f)))
+                    FarmAutomation.StartHarvestOnly();
+
                 if (ColoredButton("収穫 → 選択中の種をまく", new(210, 0), new Vector4(0.10f, 0.48f, 0.24f, 1f)))
                     FarmAutomation.StartHarvestAndSow();
             }
@@ -1569,7 +1572,7 @@ internal class MainWindow : Window
         ImGui.Spacing();
 
         ImGui.TextUnformatted("畑");
-        ImGui.BulletText("対象区画を選び、Slot 0 ～ 19 の順で水やり、または収穫→種まきを処理します。");
+        ImGui.BulletText("対象区画を選び、Slot 0 ～ 19 の順で水やり、収穫のみ、または収穫→種まきを処理します。");
         ImGui.BulletText("ゲーム内の畑番号は1から、プラグインのSlot番号は0から始まります。");
         ImGui.BulletText("マメット管理中の区画は対象外です。");
         ImGui.BulletText("ランク20の環境で開発しているため、開拓状況によっては未確認の状態があります。");
