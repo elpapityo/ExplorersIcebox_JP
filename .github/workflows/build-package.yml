@@ -50,6 +50,12 @@ jobs:
           "DALAMUD_HOME=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
           Write-Host "Dalamud dev assemblies: $dir"
 
+      - name: Prepare local icon asset
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "assets" -Force | Out-Null
+          Copy-Item "images/icon.png" "assets/ExplorersIceboxJP.png" -Force
+
       - name: Restore
         shell: pwsh
         run: dotnet restore ExplorersIcebox.sln
