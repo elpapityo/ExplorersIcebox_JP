@@ -1,4 +1,4 @@
-# ExplorersIceboxJP v0.1.3
+# ExplorersIceboxJP v0.1.4
 
 ## 改変版・ライセンス表記
 
