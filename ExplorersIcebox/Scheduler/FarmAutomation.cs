@@ -19,8 +19,12 @@ namespace ExplorersIcebox.Scheduler;
 /// </summary>
 internal static unsafe class FarmAutomation
 {
+    private const uint HarvestCurrentMode = 1;
+    private const int HarvestModeMenuIndex = 0;
+    private const uint SowCurrentMode = 2;
+    private const int SowModeMenuIndex = 1;
     private const uint WaterCurrentMode = 3;
-    private const int WaterModeMenuIndex = 3;
+    private const int WaterModeMenuIndex = 2;
     private const int QueueRefreshRemaining = 1;
     // Mandatory checkpoints for every transition from the lower farm (Slot 0-9)
     // to the upper farm (Slot 10-19).
@@ -44,6 +48,12 @@ internal static unsafe class FarmAutomation
         uint PlotObjectIndex,
         uint LayoutId);
 
+    private enum FarmRunKind
+    {
+        Water,
+        HarvestAndSow,
+    }
+
     private enum RunStep
     {
         Idle,
@@ -52,6 +62,12 @@ internal static unsafe class FarmAutomation
         SetWaterMode,
         WaterInteract,
         WaitWater,
+        SetHarvestMode,
+        HarvestInteract,
+        WaitHarvest,
+        SetSowMode,
+        SowInteract,
+        WaitSow,
         ApproachFarm,
         CrossToBackFarm,
         CrossToBackFarmSecond,
@@ -69,8 +85,10 @@ internal static unsafe class FarmAutomation
     private static string status = "停止中";
     private static bool updateHooked;
     private static long lastMoveRequest;
-    private static bool waterModeClickSent;
+    private static bool modeClickSent;
     private static bool farmMidpointDone;
+    private static FarmRunKind runKind = FarmRunKind.Water;
+    private static uint selectedSeedItem;
 
     internal static bool IsRunning => runStep != RunStep.Idle;
     internal static string Status => status;
@@ -115,6 +133,12 @@ internal static unsafe class FarmAutomation
     {
         var mgr = MJIManager.Instance();
         return mgr == null ? 0 : mgr->CurrentMode;
+    }
+
+    internal static uint GetCurrentModeItem()
+    {
+        var mgr = MJIManager.Instance();
+        return mgr == null ? 0 : mgr->CurrentModeItem;
     }
 
     internal static bool StartWatering()
@@ -162,11 +186,77 @@ internal static unsafe class FarmAutomation
         runStep = RunStep.FindPlot;
         stepStarted = Environment.TickCount64;
         lastMoveRequest = 0;
-        waterModeClickSent = false;
+        modeClickSent = false;
         farmMidpointDone = false;
+        runKind = FarmRunKind.Water;
+        selectedSeedItem = 0;
         EnsureUpdateHook();
         PluginLog.Information($"[Farm] 水やり開始: targets={masterTargetSlots.Count} visible={runQueue.Count} threshold={threshold}");
         status = $"水やり開始: {masterTargetSlots.Count}区画";
+        return true;
+    }
+
+    internal static bool StartHarvestAndSow()
+    {
+        if (IsRunning)
+            return false;
+        if (!IsFarmAvailable)
+        {
+            status = "畑情報を取得できません。";
+            return false;
+        }
+        if (SchedulerMain.State != IceBoxState.Idle || P.taskManager.NumQueuedTasks > 0 || PastureAutomation.IsHarvestRunning || PastureAutomation.IsRecording || PastureAutomation.IsRegisteringFeed)
+        {
+            status = "他の自動処理を停止してから開始してください。";
+            return false;
+        }
+        if (!NavmeshIPC.Installed)
+        {
+            status = "vnavmesh が必要です。";
+            return false;
+        }
+
+        var mgr = MJIManager.Instance();
+        if (mgr == null || mgr->CurrentMode != SowCurrentMode || mgr->CurrentModeItem == 0)
+        {
+            status = "ゲーム側で「種まき」モードにして、使用する種を選択してから開始してください。";
+            return false;
+        }
+
+        masterTargetSlots.Clear();
+        completedSlots.Clear();
+        runQueue.Clear();
+        activeSlot = -1;
+
+        selectedSeedItem = mgr->CurrentModeItem;
+        runKind = FarmRunKind.HarvestAndSow;
+
+        foreach (var slot in GetSlots())
+        {
+            if (!C.FarmWaterTargetSlots.Contains(slot.SlotId))
+                continue;
+            if (!ShouldHarvestAndSow(slot))
+                continue;
+            masterTargetSlots.Add(slot.SlotId);
+        }
+
+        if (masterTargetSlots.Count == 0)
+        {
+            status = "収穫可能な対象区画はありません。";
+            selectedSeedItem = 0;
+            runKind = FarmRunKind.Water;
+            return false;
+        }
+
+        RefreshVisibleQueue();
+        runStep = RunStep.FindPlot;
+        stepStarted = Environment.TickCount64;
+        lastMoveRequest = 0;
+        modeClickSent = false;
+        farmMidpointDone = false;
+        EnsureUpdateHook();
+        PluginLog.Information($"[Farm] 収穫→種まき開始: targets={masterTargetSlots.Count} seedItem={selectedSeedItem}");
+        status = $"収穫→種まき開始: {masterTargetSlots.Count}区画 / SeedItem={selectedSeedItem}";
         return true;
     }
 
@@ -181,8 +271,10 @@ internal static unsafe class FarmAutomation
         runStep = RunStep.Idle;
         stepStarted = 0;
         lastMoveRequest = 0;
-        waterModeClickSent = false;
+        modeClickSent = false;
         farmMidpointDone = false;
+        selectedSeedItem = 0;
+        runKind = FarmRunKind.Water;
         status = reason;
         RemoveUpdateHookIfIdle();
         PluginLog.Information($"[Farm] 停止: {reason}");
@@ -225,6 +317,16 @@ internal static unsafe class FarmAutomation
             && slot.YieldAvailable == 0
             && slot.WaterLevel <= threshold;
     }
+
+    private static bool ShouldHarvestAndSow(FarmSlotState slot)
+        => slot.SeedType != 0
+            && !slot.UnderCare
+            && slot.YieldAvailable > 0;
+
+    private static bool ShouldProcess(FarmSlotState slot)
+        => runKind == FarmRunKind.HarvestAndSow
+            ? ShouldHarvestAndSow(slot)
+            : ShouldWater(slot, Math.Clamp(C.FarmWaterLevelThreshold, 0, 255));
 
     private static void EnsureUpdateHook()
     {
@@ -282,6 +384,28 @@ internal static unsafe class FarmAutomation
             case RunStep.WaitWater:
                 if (slot == null) CompleteActive("区画情報が消えたため次へ");
                 else TickWaitWater(slot);
+                break;
+            case RunStep.SetHarvestMode:
+                TickSetMode(HarvestCurrentMode, HarvestModeMenuIndex, RunStep.HarvestInteract, "収穫");
+                break;
+            case RunStep.HarvestInteract:
+                if (slot == null) CompleteActive("区画情報が消えたためスキップ");
+                else TickHarvestInteract(slot);
+                break;
+            case RunStep.WaitHarvest:
+                if (slot == null) CompleteActive("区画情報が消えたため次へ");
+                else TickWaitHarvest(slot);
+                break;
+            case RunStep.SetSowMode:
+                TickSetSowMode();
+                break;
+            case RunStep.SowInteract:
+                if (slot == null) CompleteActive("区画情報が消えたためスキップ");
+                else TickSowInteract(slot);
+                break;
+            case RunStep.WaitSow:
+                if (slot == null) CompleteActive("区画情報が消えたため次へ");
+                else TickWaitSow(slot);
                 break;
             case RunStep.ApproachFarm:
                 TickApproachFarm();
@@ -345,7 +469,7 @@ internal static unsafe class FarmAutomation
         runQueue.Remove(nextSlot);
 
         var slot = GetSlots().FirstOrDefault(x => x.SlotId == activeSlot);
-        if (slot == null || !ShouldWater(slot, Math.Clamp(C.FarmWaterLevelThreshold, 0, 255)))
+        if (slot == null || !ShouldProcess(slot))
         {
             completedSlots.Add(activeSlot);
             activeSlot = -1;
@@ -369,9 +493,9 @@ internal static unsafe class FarmAutomation
 
     private static void TickMoveToPlot(FarmSlotState slot)
     {
-        if (!ShouldWater(slot, Math.Clamp(C.FarmWaterLevelThreshold, 0, 255)))
+        if (!ShouldProcess(slot))
         {
-            CompleteActive("水やり不要になったためスキップ");
+            CompleteActive(runKind == FarmRunKind.HarvestAndSow ? "収穫対象でなくなったためスキップ" : "水やり不要になったためスキップ");
             return;
         }
 
@@ -392,9 +516,11 @@ internal static unsafe class FarmAutomation
         {
             if (P.navmesh.IsRunning())
                 P.navmesh.Stop();
-            runStep = RunStep.SetWaterMode;
+            runStep = runKind == FarmRunKind.HarvestAndSow ? RunStep.SetHarvestMode : RunStep.SetWaterMode;
             stepStarted = Environment.TickCount64;
-            status = $"Slot {slot.SlotId} 水やりモードへ切替";
+            status = runKind == FarmRunKind.HarvestAndSow
+                ? $"Slot {slot.SlotId} 収穫モードへ切替"
+                : $"Slot {slot.SlotId} 水やりモードへ切替";
             return;
         }
 
@@ -416,14 +542,14 @@ internal static unsafe class FarmAutomation
             return;
         if (mgr->CurrentMode == WaterCurrentMode)
         {
-            waterModeClickSent = false;
+            modeClickSent = false;
             runStep = RunStep.WaterInteract;
             stepStarted = Environment.TickCount64;
             PluginLog.Information($"[Farm] 水やりMode確認 Mode={mgr->CurrentMode}");
             return;
         }
 
-        if (!waterModeClickSent)
+        if (!modeClickSent)
         {
             if (TryGetAddonByName("ContextIconMenu", out AtkUnitBase* context) && IsAddonReady(context) && context->IsVisible)
             {
@@ -432,7 +558,7 @@ internal static unsafe class FarmAutomation
                     // Pasture v72 uses this same ContextIconMenu callback shape.
                     // Runtime log verification on v1.1.0.75 established index 2 -> CurrentMode 2; water CurrentMode 3 uses index 3.
                     Callback.Fire(context, true, 0, WaterModeMenuIndex, 0, 0, 0);
-                    waterModeClickSent = true;
+                    modeClickSent = true;
                     PluginLog.Information($"[Farm] 水やりメニュー選択 index={WaterModeMenuIndex} beforeMode={mgr->CurrentMode} expectedMode={WaterCurrentMode}");
                 }
             }
@@ -506,6 +632,190 @@ internal static unsafe class FarmAutomation
 
         if (Environment.TickCount64 - stepStarted > 6000)
             Stop($"Slot {current.SlotId} の水分値が変化しないため停止しました。Water={current.WaterLevel}");
+    }
+
+
+    private static void TickSetMode(uint expectedMode, int menuIndex, RunStep nextStep, string modeName)
+    {
+        var mgr = MJIManager.Instance();
+        if (mgr == null)
+            return;
+
+        if (mgr->CurrentMode == expectedMode)
+        {
+            modeClickSent = false;
+            runStep = nextStep;
+            stepStarted = Environment.TickCount64;
+            PluginLog.Information($"[Farm] {modeName}Mode確認 Mode={mgr->CurrentMode} Item={mgr->CurrentModeItem}");
+            return;
+        }
+
+        if (!modeClickSent)
+        {
+            if (TryGetAddonByName("ContextIconMenu", out AtkUnitBase* context) && IsAddonReady(context) && context->IsVisible)
+            {
+                if (EzThrottler.Throttle($"Farm{modeName}_ContextMenu", 500))
+                {
+                    Callback.Fire(context, true, 0, menuIndex, 0, 0, 0);
+                    modeClickSent = true;
+                    PluginLog.Information($"[Farm] {modeName}メニュー選択 index={menuIndex} beforeMode={mgr->CurrentMode} expectedMode={expectedMode}");
+                }
+            }
+            else if (TryGetAddonByName("MJIHud", out AtkUnitBase* hud) && IsAddonReady(hud))
+            {
+                if (EzThrottler.Throttle($"Farm{modeName}_OpenModeMenu", 500))
+                    Callback.Fire(hud, false, 11, 0);
+            }
+        }
+        else if (EzThrottler.Throttle($"Farm{modeName}_WaitMode", 1000))
+        {
+            PluginLog.Information($"[Farm] {modeName}モード待ち actual={mgr->CurrentMode} expected={expectedMode}");
+        }
+
+        if (Environment.TickCount64 - stepStarted > 6500)
+            Stop($"{modeName}モード(CurrentMode={expectedMode})へ切り替わらないため停止しました。実値={mgr->CurrentMode}");
+    }
+
+    private static void TickHarvestInteract(FarmSlotState slot)
+    {
+        if (!TryGetPlotObject(slot, out var obj) || obj == null)
+        {
+            activeSlot = -1;
+            runStep = RunStep.FindPlot;
+            stepStarted = Environment.TickCount64;
+            RefreshVisibleQueue();
+            return;
+        }
+
+        if (Vector3.Distance(Svc.Objects.LocalPlayer!.Position, obj.Position) > 3.6f)
+        {
+            runStep = RunStep.MoveToPlot;
+            stepStarted = Environment.TickCount64;
+            return;
+        }
+
+        Utils.TargetgameObject(obj);
+        Utils.InteractWithObject(obj);
+        PluginLog.Information($"[Farm] Slot={slot.SlotId} 収穫実行 Seed={slot.SeedType} Yield={slot.YieldAvailable}");
+        runStep = RunStep.WaitHarvest;
+        stepStarted = Environment.TickCount64;
+        status = $"Slot {slot.SlotId} 収穫確認中";
+    }
+
+    private static void TickWaitHarvest(FarmSlotState original)
+    {
+        var current = GetSlots().FirstOrDefault(x => x.SlotId == original.SlotId);
+        if (current == null)
+        {
+            CompleteActive("区画情報が消えたため次へ");
+            return;
+        }
+
+        if (current.SeedType == 0)
+        {
+            PluginLog.Information($"[Farm] Slot={current.SlotId} 収穫確認成功 Seed={original.SeedType}->0 Yield={original.YieldAvailable}->{current.YieldAvailable}");
+            runStep = RunStep.SetSowMode;
+            stepStarted = Environment.TickCount64;
+            modeClickSent = false;
+            status = $"Slot {current.SlotId} 種まきモードへ切替";
+            return;
+        }
+
+        if (Environment.TickCount64 - stepStarted > 6000)
+            Stop($"Slot {current.SlotId} の収穫後に空区画を確認できないため停止しました。Seed={current.SeedType} Yield={current.YieldAvailable}");
+    }
+
+    private static void TickSetSowMode()
+    {
+        var mgr = MJIManager.Instance();
+        if (mgr == null)
+            return;
+
+        if (mgr->CurrentMode == SowCurrentMode)
+        {
+            if (mgr->CurrentModeItem != selectedSeedItem)
+            {
+                Stop($"種まきモードへ戻りましたが、開始時に選択していた種を確認できません。開始時Item={selectedSeedItem} 現在Item={mgr->CurrentModeItem}");
+                return;
+            }
+
+            modeClickSent = false;
+            runStep = RunStep.SowInteract;
+            stepStarted = Environment.TickCount64;
+            PluginLog.Information($"[Farm] 種まきMode確認 Mode={mgr->CurrentMode} SeedItem={mgr->CurrentModeItem}");
+            return;
+        }
+
+        TickSetMode(SowCurrentMode, SowModeMenuIndex, RunStep.SowInteract, "種まき");
+    }
+
+    private static void TickSowInteract(FarmSlotState slot)
+    {
+        var mgr = MJIManager.Instance();
+        if (mgr == null)
+            return;
+
+        if (mgr->CurrentMode != SowCurrentMode || mgr->CurrentModeItem != selectedSeedItem)
+        {
+            runStep = RunStep.SetSowMode;
+            stepStarted = Environment.TickCount64;
+            return;
+        }
+
+        var current = GetSlots().FirstOrDefault(x => x.SlotId == slot.SlotId);
+        if (current == null)
+        {
+            CompleteActive("区画情報が消えたため次へ");
+            return;
+        }
+        if (current.SeedType != 0)
+        {
+            CompleteActive($"Slot {current.SlotId} は既に種まき済みのため次へ");
+            return;
+        }
+
+        if (!TryGetPlotObject(current, out var obj) || obj == null)
+        {
+            activeSlot = -1;
+            runStep = RunStep.FindPlot;
+            stepStarted = Environment.TickCount64;
+            RefreshVisibleQueue();
+            return;
+        }
+
+        if (Vector3.Distance(Svc.Objects.LocalPlayer!.Position, obj.Position) > 3.6f)
+        {
+            runStep = RunStep.MoveToPlot;
+            stepStarted = Environment.TickCount64;
+            return;
+        }
+
+        Utils.TargetgameObject(obj);
+        Utils.InteractWithObject(obj);
+        PluginLog.Information($"[Farm] Slot={current.SlotId} 種まき実行 SelectedSeedItem={selectedSeedItem}");
+        runStep = RunStep.WaitSow;
+        stepStarted = Environment.TickCount64;
+        status = $"Slot {current.SlotId} 種まき確認中";
+    }
+
+    private static void TickWaitSow(FarmSlotState original)
+    {
+        var current = GetSlots().FirstOrDefault(x => x.SlotId == original.SlotId);
+        if (current == null)
+        {
+            CompleteActive("区画情報が消えたため次へ");
+            return;
+        }
+
+        if (current.SeedType != 0)
+        {
+            PluginLog.Information($"[Farm] Slot={current.SlotId} 種まき確認成功 SeedType={current.SeedType} SelectedSeedItem={selectedSeedItem}");
+            CompleteActive($"Slot {current.SlotId} 収穫→種まき完了");
+            return;
+        }
+
+        if (Environment.TickCount64 - stepStarted > 6000)
+            Stop($"Slot {current.SlotId} の種まき後にSeedTypeが変化しないため停止しました。SelectedSeedItem={selectedSeedItem}");
     }
 
     private static bool ShouldCrossFarmMidpoint()
@@ -663,10 +973,17 @@ internal static unsafe class FarmAutomation
         runStep = RunStep.Idle;
         stepStarted = 0;
         lastMoveRequest = 0;
-        waterModeClickSent = false;
+        modeClickSent = false;
         farmMidpointDone = false;
-        status = "水やり完了";
-        PluginLog.Information($"[Farm] 水やり完了: {total}区画");
+        var completedKind = runKind;
+        var completedSeedItem = selectedSeedItem;
+        selectedSeedItem = 0;
+        runKind = FarmRunKind.Water;
+        status = completedKind == FarmRunKind.HarvestAndSow ? "収穫→種まき完了" : "水やり完了";
+        if (completedKind == FarmRunKind.HarvestAndSow)
+            PluginLog.Information($"[Farm] 収穫→種まき完了: {total}区画 SeedItem={completedSeedItem}");
+        else
+            PluginLog.Information($"[Farm] 水やり完了: {total}区画");
         RemoveUpdateHookIfIdle();
     }
 
@@ -675,13 +992,12 @@ internal static unsafe class FarmAutomation
         if (masterTargetSlots.Count == 0)
             return;
 
-        var threshold = Math.Clamp(C.FarmWaterLevelThreshold, 0, 255);
         var slots = GetSlots().ToDictionary(x => x.SlotId);
         foreach (var slotId in masterTargetSlots)
         {
             if (completedSlots.Contains(slotId) || slotId == activeSlot)
                 continue;
-            if (!slots.TryGetValue(slotId, out var slot) || !ShouldWater(slot, threshold))
+            if (!slots.TryGetValue(slotId, out var slot) || !ShouldProcess(slot))
                 completedSlots.Add(slotId);
         }
 
@@ -693,7 +1009,6 @@ internal static unsafe class FarmAutomation
         if (Svc.Objects.LocalPlayer == null)
             return;
 
-        var threshold = Math.Clamp(C.FarmWaterLevelThreshold, 0, 255);
         var slots = GetSlots().ToDictionary(x => x.SlotId);
         var known = new HashSet<int>(runQueue);
         if (activeSlot >= 0)
@@ -704,7 +1019,7 @@ internal static unsafe class FarmAutomation
         {
             if (completedSlots.Contains(slotId) || known.Contains(slotId))
                 continue;
-            if (!slots.TryGetValue(slotId, out var slot) || !ShouldWater(slot, threshold))
+            if (!slots.TryGetValue(slotId, out var slot) || !ShouldProcess(slot))
                 continue;
             if (!TryGetPlotObject(slot, out var obj) || obj == null)
                 continue;
