@@ -1569,7 +1569,7 @@ internal class MainWindow : Window
         ImGui.Spacing();
 
         ImGui.TextUnformatted("畑");
-        ImGui.BulletText("現在は水やりのみ対応しています。対象区画を選び、Slot 0 ～ 19 の順で処理します。");
+        ImGui.BulletText("対象区画を選び、Slot 0 ～ 19 の順で水やり、または収穫→種まきを処理します。");
         ImGui.BulletText("ゲーム内の畑番号は1から、プラグインのSlot番号は0から始まります。");
         ImGui.BulletText("マメット管理中の区画は対象外です。");
         ImGui.BulletText("ランク20の環境で開発しているため、開拓状況によっては未確認の状態があります。");
@@ -1586,7 +1586,7 @@ internal class MainWindow : Window
         ImGui.Spacing();
 
         ImGui.TextUnformatted("未実装・対象外の機能");
-        ImGui.BulletText("畑：収穫・種まきは未実装です。");
+        ImGui.BulletText("畑：収穫→種まきは、ゲーム側で種まきモードと使用する種を選択してから開始します。");
         ImGui.BulletText("畑：マメットの管理・操作は対象外です。");
         ImGui.BulletText("牧場：動物ごとの個別餌設定は未実装です。");
         ImGui.BulletText("牧場：餌やり／収穫を動物ごとに個別設定する機能は未実装です。");
