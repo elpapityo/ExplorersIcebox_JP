@@ -1,0 +1,116 @@
+name: Build ExplorersIceboxJP package
+
+on:
+  push:
+    branches:
+      - master
+      - dev/farm-harvest-sow
+    paths:
+      - "VERSION.txt"
+      - "ExplorersIcebox/**"
+      - ".github/workflows/build-package.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION.txt -Raw).Trim()
+          if (-not $version) { throw "VERSION.txt is empty" }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Version: $version"
+
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore ExplorersIcebox.sln
+
+      - name: Build Release
+        shell: pwsh
+        run: dotnet build ExplorersIcebox.sln -c Release --no-restore
+
+      - name: Create distribution package
+        id: package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "${{ steps.version.outputs.version }}"
+          $dll = Get-ChildItem -Path "ExplorersIcebox/bin" -Recurse -Filter "ExplorersIceboxJP.dll" |
+            Where-Object { $_.FullName -match "\\Release\\" } |
+            Select-Object -First 1
+          if (-not $dll) { throw "ExplorersIceboxJP.dll was not found in Release output." }
+
+          $outDir = $dll.Directory.FullName
+          Write-Host "Build output: $outDir"
+
+          $stage = Join-Path $env:RUNNER_TEMP "ExplorersIceboxJP_v$version"
+          if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+          New-Item -ItemType Directory -Path $stage | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $stage "images") | Out-Null
+
+          Copy-Item (Join-Path $outDir "*.dll") $stage -Force
+          if (Test-Path (Join-Path $outDir "ExplorersIceboxJP.deps.json")) {
+            Copy-Item (Join-Path $outDir "ExplorersIceboxJP.deps.json") $stage -Force
+          }
+
+          Copy-Item "ExplorersIcebox/ExplorersIceboxJP.json" (Join-Path $stage "ExplorersIceboxJP.json") -Force
+          Copy-Item "images/icon.png" (Join-Path $stage "images/icon.png") -Force
+          Copy-Item "LICENSE.md" $stage -Force
+          Copy-Item "NOTICE.md" $stage -Force
+          Copy-Item "SOURCE.md" $stage -Force
+          Copy-Item "README.md" $stage -Force
+          Copy-Item "README_JP.md" $stage -Force
+
+          $manifest = Get-Content (Join-Path $stage "ExplorersIceboxJP.json") -Raw | ConvertFrom-Json
+          $expected = "$version.0"
+          if ($manifest.AssemblyVersion -ne $expected) {
+            throw "AssemblyVersion mismatch: $($manifest.AssemblyVersion) != $expected"
+          }
+
+          $uploadDir = Join-Path $PWD "upload"
+          New-Item -ItemType Directory -Path $uploadDir -Force | Out-Null
+          $zip = Join-Path $uploadDir "ExplorersIceboxJP_v$version.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zip -Force
+
+          if (-not (Test-Path $zip)) { throw "Package ZIP was not created." }
+          if ((Get-Item $zip).Length -le 0) { throw "Package ZIP is empty." }
+
+          Write-Host "Package: $zip"
+          "zip=$zip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ExplorersIceboxJP-v${{ steps.version.outputs.version }}
+          path: upload/ExplorersIceboxJP_v${{ steps.version.outputs.version }}.zip
+          if-no-files-found: error
+
+      - name: Commit package on master
+        if: github.ref == 'refs/heads/master'
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "upload/ExplorersIceboxJP_v$version.zip"
+          if (git diff --cached --quiet) {
+            Write-Host "Package already committed."
+            exit 0
+          }
+          git commit -m "Add ExplorersIceboxJP v$version distribution package"
+          git push
