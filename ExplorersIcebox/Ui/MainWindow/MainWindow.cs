@@ -1223,11 +1223,11 @@ internal class MainWindow : Window
 
     private void DrawFarm()
     {
-        ImGui.TextUnformatted("畑（水やり）");
+        ImGui.TextUnformatted("畑（水やり・収穫・種まき）");
         ImGui.Separator();
         if (ImGui.CollapsingHeader("使い方・注意事項##FarmHelp"))
         {
-            ImGui.TextWrapped("現在は水やりのみ対応しています。対象にしたい畑へチェックを入れてから実行してください。Slot 0 ～ 19 を順番に回ります。");
+            ImGui.TextWrapped("対象にしたい畑へチェックを入れてから実行してください。水やり、収穫、または種まき→水やりを Slot 0 ～ 19 の順番で処理します。");
             ImGui.TextWrapped("ゲーム内の畑番号は1からですが、プラグイン上のSlot番号は0から始まります。");
             ImGui.TextColored(new Vector4(1.00f, 0.72f, 0.20f, 1f), "注意");
             ImGui.SameLine();
@@ -1235,7 +1235,7 @@ internal class MainWindow : Window
             ImGui.TextColored(new Vector4(1.00f, 0.72f, 0.20f, 1f), "注意");
             ImGui.SameLine();
             ImGui.TextWrapped("本機能はランク20の環境で開発しています。開拓状況によっては未確認の状態があります。申し訳ありません。");
-            ImGui.TextWrapped("収穫・種まきは現在未実装です。ご要望があれば実装を検討します。");
+            ImGui.TextWrapped("種まき→水やり：ゲーム側を「種まき」モードにして使用したい種を選択し、空き区画を対象にして開始してください。種まき後、同じ区画へ水やりします。");
             ImGui.TextWrapped("水分値はゲーム内部の値をそのまま表示します。");
         }
         ImGui.Spacing();
@@ -1247,7 +1247,7 @@ internal class MainWindow : Window
         }
 
         var slots = FarmAutomation.GetSlots();
-        ImGui.TextUnformatted($"現在モード: {FarmAutomation.GetCurrentMode()}（水やり=3）");
+        ImGui.TextUnformatted($"現在モード: {FarmAutomation.GetCurrentMode()}（収穫=1 / 種まき=2 / 水やり=3）  選択アイテムID: {FarmAutomation.GetCurrentModeItem()}");
 
         var threshold = C.FarmWaterLevelThreshold;
         ImGui.SetNextItemWidth(90f);
@@ -1272,11 +1272,17 @@ internal class MainWindow : Window
             {
                 if (ColoredButton("選択区画の水やりを開始", new(180, 0), new Vector4(0.10f, 0.48f, 0.24f, 1f)))
                     FarmAutomation.StartWatering();
+                ImGui.SameLine();
+                if (ColoredButton("選択区画を収穫", new(150, 0), new Vector4(0.10f, 0.48f, 0.24f, 1f)))
+                    FarmAutomation.StartHarvestOnly();
+
+                if (ColoredButton("種まき → 水やり", new(180, 0), new Vector4(0.10f, 0.48f, 0.24f, 1f)))
+                    FarmAutomation.StartSowAndWater();
             }
         }
         else
         {
-            if (ColoredButton("水やりを停止", new(130, 0), new Vector4(0.62f, 0.18f, 0.18f, 1f)))
+            if (ColoredButton("畑処理を停止", new(130, 0), new Vector4(0.62f, 0.18f, 0.18f, 1f)))
                 FarmAutomation.Stop("ユーザーが停止しました");
         }
         ImGui.SameLine();
@@ -1287,7 +1293,7 @@ internal class MainWindow : Window
         {
             if (ImGui.Button("対象区画をすべて選択##FarmSelectAll"))
             {
-                foreach (var slot in slots.Where(x => !x.UnderCare && x.SeedType != 0))
+                foreach (var slot in slots.Where(x => !x.UnderCare))
                     C.FarmWaterTargetSlots.Add(slot.SlotId);
                 C.Save();
             }
@@ -1319,7 +1325,7 @@ internal class MainWindow : Window
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
                 var selected = C.FarmWaterTargetSlots.Contains(slot.SlotId);
-                using (ImRaii.Disabled(slot.UnderCare || slot.SeedType == 0 || FarmAutomation.IsRunning))
+                using (ImRaii.Disabled(slot.UnderCare || FarmAutomation.IsRunning))
                 {
                     if (ImGui.Checkbox($"##FarmTarget_{slot.SlotId}", ref selected))
                     {
@@ -1342,8 +1348,19 @@ internal class MainWindow : Window
                 ImGui.TableNextColumn();
                 ImGui.TextUnformatted(slot.UnderCare ? "マメット管理" : "プラグイン対象");
                 ImGui.TableNextColumn();
-                var needsWater = slot.SeedType != 0 && !slot.UnderCare && slot.YieldAvailable == 0 && slot.WaterLevel <= C.FarmWaterLevelThreshold;
-                ImGui.TextUnformatted(needsWater ? "水やり対象" : "対象外");
+                var harvestReady = FarmAutomation.IsHarvestReady(slot);
+                var needsWater = slot.SeedType != 0
+                    && !slot.UnderCare
+                    && !harvestReady
+                    && slot.WaterLevel <= C.FarmWaterLevelThreshold;
+                if (slot.UnderCare)
+                    ImGui.TextUnformatted("対象外");
+                else if (slot.SeedType == 0)
+                    ImGui.TextUnformatted("種まき対象");
+                else if (harvestReady)
+                    ImGui.TextUnformatted("収穫可能");
+                else
+                    ImGui.TextUnformatted(needsWater ? "水やり対象" : "対象外");
             }
 
             ImGui.EndTable();
@@ -1561,7 +1578,7 @@ internal class MainWindow : Window
         ImGui.Spacing();
 
         ImGui.TextUnformatted("畑");
-        ImGui.BulletText("現在は水やりのみ対応しています。対象区画を選び、Slot 0 ～ 19 の順で処理します。");
+        ImGui.BulletText("対象区画を選び、Slot 0 ～ 19 の順で水やり、収穫、または種まき→水やりを処理します。");
         ImGui.BulletText("ゲーム内の畑番号は1から、プラグインのSlot番号は0から始まります。");
         ImGui.BulletText("マメット管理中の区画は対象外です。");
         ImGui.BulletText("ランク20の環境で開発しているため、開拓状況によっては未確認の状態があります。");
@@ -1578,7 +1595,7 @@ internal class MainWindow : Window
         ImGui.Spacing();
 
         ImGui.TextUnformatted("未実装・対象外の機能");
-        ImGui.BulletText("畑：収穫・種まきは未実装です。");
+        ImGui.BulletText("畑：種まき→水やりは、ゲーム側で種まきモードと使用する種を選択し、空き区画を対象にして開始します。");
         ImGui.BulletText("畑：マメットの管理・操作は対象外です。");
         ImGui.BulletText("牧場：動物ごとの個別餌設定は未実装です。");
         ImGui.BulletText("牧場：餌やり／収穫を動物ごとに個別設定する機能は未実装です。");

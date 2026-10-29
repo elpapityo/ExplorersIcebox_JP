@@ -4,9 +4,9 @@
     "Name": "ExplorersIceboxJP",
     "Punchline": "無人島開拓のレベル上げ・素材収集を自動化します。",
     "Description": "無人島開拓でのレベル上げや素材収集を支援する日本語化カスタム版です。vnavmesh と Lifestream が必要です。",
-    "Changelog": "v0.1.1: インストール後にアイコンが「？」になる問題を修正。プラグイン本体ManifestにIconUrl/RepoUrlを追加。",
+    "Changelog": "v0.1.4: 畑の操作を「水やり」「収穫」「種まき→水やり」に分離。空き区画へ選択中の種をまき、その区画へ続けて水やりします。",
     "InternalName": "ExplorersIceboxJP",
-    "AssemblyVersion": "0.1.1.0",
+    "AssemblyVersion": "0.1.4.0",
     "RepoUrl": "https://github.com/elpapityo/ExplorersIcebox_JP",
     "ApplicableVersion": "any",
     "Tags": [
@@ -16,11 +16,11 @@
     ],
     "DalamudApiLevel": 15,
     "LoadPriority": 0,
-    "IconUrl": "https://raw.githubusercontent.com/elpapityo/ExplorersIcebox_JP/master/images/icon.png?v=0.1.1",
+    "IconUrl": "https://raw.githubusercontent.com/elpapityo/ExplorersIcebox_JP/master/images/icon.png?v=0.1.4",
     "ImageUrls": [],
-    "DownloadLinkInstall": "https://github.com/elpapityo/ExplorersIcebox_JP/releases/download/V0.1.1/ExplorersIceboxJP_v0.1.1.zip",
-    "DownloadLinkUpdate": "https://github.com/elpapityo/ExplorersIcebox_JP/releases/download/V0.1.1/ExplorersIceboxJP_v0.1.1.zip",
-    "DownloadLinkTesting": "https://github.com/elpapityo/ExplorersIcebox_JP/releases/download/V0.1.1/ExplorersIceboxJP_v0.1.1.zip",
+    "DownloadLinkInstall": "https://github.com/elpapityo/ExplorersIcebox_JP/releases/download/V0.1.4/ExplorersIceboxJP_v0.1.4.zip",
+    "DownloadLinkUpdate": "https://github.com/elpapityo/ExplorersIcebox_JP/releases/download/V0.1.4/ExplorersIceboxJP_v0.1.4.zip",
+    "DownloadLinkTesting": "https://github.com/elpapityo/ExplorersIcebox_JP/releases/download/V0.1.4/ExplorersIceboxJP_v0.1.4.zip",
     "IsHide": false,
     "IsTestingExclusive": false
   }

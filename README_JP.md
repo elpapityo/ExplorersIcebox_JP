@@ -1,11 +1,11 @@
-# ExplorersIceboxJP v0.1.1
+# ExplorersIceboxJP v0.1.4
 
 ## 改変版・ライセンス表記
 
 - Original project: **Explorers-Icebox** by **Ice / LeontopodiumNivale14**
 - Modified version: **ExplorersIceboxJP**
 - Modified by: **Elpa**
-- Modification date for this release: **2026-10-07**
+- Modification date for this release: **2026-10-30**
 - License: **GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)**
 
 本プロジェクトは Explorers-Icebox を改変した派生版であり、元プロジェクトと同じ AGPL-3.0-or-later の条件で公開します。
@@ -18,7 +18,7 @@ ExplorersIceboxJP は、毎日の無人島作業の手間を少しお手伝い�
 
 - 無人島の通常採集
 - 収集リストによる目標数までの素材収集
-- 畑の対象区画への水やり
+- 畑の対象区画への水やり・収穫・種まき
 - 牧場の対象動物への餌やり・収穫
 - アイルデジョン／無人島への帰還補助
 - 日本語UI
@@ -37,7 +37,6 @@ ExplorersIceboxJP は、毎日の無人島作業の手間を少しお手伝い�
 ## 注意・未実装
 
 - 飛行未解放時は、本家仕様により一部素材を自動採取できません。飛行可能になるまでは一部を手動で採取してください。
-- 畑は現在、水やりのみ対応しています。収穫・種まきは未実装です。
 - 畑のマメット管理・操作は対象外です。
 - 牧場では動物ごとの個別餌設定、餌やり／収穫の個別指定には対応していません。
 
