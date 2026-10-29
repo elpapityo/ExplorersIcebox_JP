@@ -7,6 +7,7 @@ using ExplorersIcebox.IPC;
 using ExplorersIcebox.Enums;
 using FFXIVClientStructs.FFXIV.Client.Game.MJI;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using Callback = ECommons.Automation.Callback;
 
@@ -41,7 +42,7 @@ internal static unsafe class FarmAutomation
         byte SeedType,
         byte WaterLevel,
         byte GrowthLevel,
-        byte YieldAvailable,
+        uint YieldAvailable,
         bool UnderCare,
         bool WasUnderCare,
         bool CareHalted,
@@ -111,16 +112,21 @@ internal static unsafe class FarmAutomation
             return result;
 
         var farm = mgr->FarmState;
+        var agent = AgentMJIFarmManagement.Instance();
         var count = Math.Clamp((int)mgr->GetFarmSlotCount(), 0, 20);
         for (var i = 0; i < count; i++)
         {
             var flags = farm->FarmSlotFlags[i];
+            var yieldAvailable = agent != null && i < agent->NumSlots
+                ? agent->Slots[i].YieldAvailable
+                : (uint)farm->GardenerYield[i];
+
             result.Add(new FarmSlotState(
                 i,
                 farm->SeedType[i],
                 farm->WaterLevel[i],
                 farm->GrowthLevel[i],
-                farm->GardenerYield[i],
+                yieldAvailable,
                 flags.HasFlag(FarmSlotFlags.UnderCare),
                 flags.HasFlag(FarmSlotFlags.WasUnderCare),
                 flags.HasFlag(FarmSlotFlags.CareHalted),
@@ -364,20 +370,24 @@ internal static unsafe class FarmAutomation
         }
     }
 
+    internal static bool IsHarvestReady(FarmSlotState slot)
+        => slot.SeedType != 0
+            && !slot.UnderCare
+            && (slot.YieldAvailable > 0 || slot.GrowthLevel >= 4);
+
     private static bool ShouldWater(FarmSlotState slot, int threshold)
     {
-        // Empty plots, mammet-managed plots and crops already waiting for harvest are excluded.
-        // WaterLevel semantics are intentionally left configurable; the default threshold remains 0.
+        // Empty plots, mammet-managed plots and mature crops are excluded.
+        // Manual-care crops can report GardenerYield=0 even when fully grown,
+        // so harvest readiness also uses GrowthLevel >= 4.
         return slot.SeedType != 0
             && !slot.UnderCare
-            && slot.YieldAvailable == 0
+            && !IsHarvestReady(slot)
             && slot.WaterLevel <= threshold;
     }
 
     private static bool ShouldHarvestAndSow(FarmSlotState slot)
-        => slot.SeedType != 0
-            && !slot.UnderCare
-            && slot.YieldAvailable > 0;
+        => IsHarvestReady(slot);
 
     private static bool ShouldProcess(FarmSlotState slot)
         => runKind == FarmRunKind.Water
