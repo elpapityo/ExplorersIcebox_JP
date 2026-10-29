@@ -20,11 +20,11 @@ namespace ExplorersIcebox.Scheduler;
 internal static unsafe class FarmAutomation
 {
     private const uint HarvestCurrentMode = 1;
-    private const int HarvestModeMenuIndex = 0;
+    private const int HarvestModeMenuIndex = 1;
     private const uint SowCurrentMode = 2;
-    private const int SowModeMenuIndex = 1;
+    private const int SowModeMenuIndex = 2;
     private const uint WaterCurrentMode = 3;
-    private const int WaterModeMenuIndex = 2;
+    private const int WaterModeMenuIndex = 3;
     private const int QueueRefreshRemaining = 1;
     // Mandatory checkpoints for every transition from the lower farm (Slot 0-9)
     // to the upper farm (Slot 10-19).
@@ -687,12 +687,23 @@ internal static unsafe class FarmAutomation
             return;
         }
 
-        if (Vector3.Distance(Svc.Objects.LocalPlayer!.Position, obj.Position) > 3.6f)
+        var distance = Vector3.Distance(Svc.Objects.LocalPlayer!.Position, obj.Position);
+        if (distance > 3.6f)
         {
-            runStep = RunStep.MoveToPlot;
-            stepStarted = Environment.TickCount64;
+            if (!P.navmesh.IsRunning() && !P.navmesh.PathfindInProgress() && Environment.TickCount64 - lastMoveRequest >= 750)
+            {
+                lastMoveRequest = Environment.TickCount64;
+                P.navmesh.PathfindAndMoveTo(obj.Position, false);
+                PluginLog.Information($"[Farm] Slot={current.SlotId} 種まき前に再接近 Dist={distance:F1}");
+            }
+
+            if (Environment.TickCount64 - stepStarted > 30000)
+                Stop($"Slot {current.SlotId} の種まき位置への移動が30秒を超えたため停止しました。");
             return;
         }
+
+        if (P.navmesh.IsRunning())
+            P.navmesh.Stop();
 
         Utils.TargetgameObject(obj);
         Utils.InteractWithObject(obj);
