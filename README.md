@@ -1,4 +1,4 @@
-# ExplorersIceboxJP v0.1.2
+# ExplorersIceboxJP v0.1.3
 
 ## Modified Work / License Notice
 
@@ -15,7 +15,7 @@ The original license text is preserved in `LICENSE.md`, and the corresponding mo
 
 - Island Sanctuary gathering routes
 - Collection targets
-- Farm watering for selected plots
+- Farm watering, harvesting, and sowing for selected plots
 - Pasture feeding and harvesting
 - Japanese UI
 
