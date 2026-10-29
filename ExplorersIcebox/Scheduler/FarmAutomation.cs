@@ -51,6 +51,7 @@ internal static unsafe class FarmAutomation
     private enum FarmRunKind
     {
         Water,
+        HarvestOnly,
         HarvestAndSow,
     }
 
@@ -196,6 +197,61 @@ internal static unsafe class FarmAutomation
         return true;
     }
 
+    internal static bool StartHarvestOnly()
+    {
+        if (IsRunning)
+            return false;
+        if (!IsFarmAvailable)
+        {
+            status = "畑情報を取得できません。";
+            return false;
+        }
+        if (SchedulerMain.State != IceBoxState.Idle || P.taskManager.NumQueuedTasks > 0 || PastureAutomation.IsHarvestRunning || PastureAutomation.IsRecording || PastureAutomation.IsRegisteringFeed)
+        {
+            status = "他の自動処理を停止してから開始してください。";
+            return false;
+        }
+        if (!NavmeshIPC.Installed)
+        {
+            status = "vnavmesh が必要です。";
+            return false;
+        }
+
+        masterTargetSlots.Clear();
+        completedSlots.Clear();
+        runQueue.Clear();
+        activeSlot = -1;
+        selectedSeedItem = 0;
+        runKind = FarmRunKind.HarvestOnly;
+
+        foreach (var slot in GetSlots())
+        {
+            if (!C.FarmWaterTargetSlots.Contains(slot.SlotId))
+                continue;
+            if (!ShouldHarvestAndSow(slot))
+                continue;
+            masterTargetSlots.Add(slot.SlotId);
+        }
+
+        if (masterTargetSlots.Count == 0)
+        {
+            status = "収穫可能な対象区画はありません。";
+            runKind = FarmRunKind.Water;
+            return false;
+        }
+
+        RefreshVisibleQueue();
+        runStep = RunStep.FindPlot;
+        stepStarted = Environment.TickCount64;
+        lastMoveRequest = 0;
+        modeClickSent = false;
+        farmMidpointDone = false;
+        EnsureUpdateHook();
+        PluginLog.Information($"[Farm] 収穫開始: targets={masterTargetSlots.Count}");
+        status = $"収穫開始: {masterTargetSlots.Count}区画";
+        return true;
+    }
+
     internal static bool StartHarvestAndSow()
     {
         if (IsRunning)
@@ -324,9 +380,9 @@ internal static unsafe class FarmAutomation
             && slot.YieldAvailable > 0;
 
     private static bool ShouldProcess(FarmSlotState slot)
-        => runKind == FarmRunKind.HarvestAndSow
-            ? ShouldHarvestAndSow(slot)
-            : ShouldWater(slot, Math.Clamp(C.FarmWaterLevelThreshold, 0, 255));
+        => runKind == FarmRunKind.Water
+            ? ShouldWater(slot, Math.Clamp(C.FarmWaterLevelThreshold, 0, 255))
+            : ShouldHarvestAndSow(slot);
 
     private static void EnsureUpdateHook()
     {
@@ -495,7 +551,7 @@ internal static unsafe class FarmAutomation
     {
         if (!ShouldProcess(slot))
         {
-            CompleteActive(runKind == FarmRunKind.HarvestAndSow ? "収穫対象でなくなったためスキップ" : "水やり不要になったためスキップ");
+            CompleteActive(runKind == FarmRunKind.Water ? "水やり不要になったためスキップ" : "収穫対象でなくなったためスキップ");
             return;
         }
 
@@ -516,11 +572,11 @@ internal static unsafe class FarmAutomation
         {
             if (P.navmesh.IsRunning())
                 P.navmesh.Stop();
-            runStep = runKind == FarmRunKind.HarvestAndSow ? RunStep.SetHarvestMode : RunStep.SetWaterMode;
+            runStep = runKind == FarmRunKind.Water ? RunStep.SetWaterMode : RunStep.SetHarvestMode;
             stepStarted = Environment.TickCount64;
-            status = runKind == FarmRunKind.HarvestAndSow
-                ? $"Slot {slot.SlotId} 収穫モードへ切替"
-                : $"Slot {slot.SlotId} 水やりモードへ切替";
+            status = runKind == FarmRunKind.Water
+                ? $"Slot {slot.SlotId} 水やりモードへ切替"
+                : $"Slot {slot.SlotId} 収穫モードへ切替";
             return;
         }
 
@@ -725,6 +781,13 @@ internal static unsafe class FarmAutomation
         if (current.SeedType == 0)
         {
             PluginLog.Information($"[Farm] Slot={current.SlotId} 収穫確認成功 Seed={original.SeedType}->0 Yield={original.YieldAvailable}->{current.YieldAvailable}");
+
+            if (runKind == FarmRunKind.HarvestOnly)
+            {
+                CompleteActive($"Slot {current.SlotId} 収穫完了");
+                return;
+            }
+
             runStep = RunStep.SetSowMode;
             stepStarted = Environment.TickCount64;
             modeClickSent = false;
@@ -1001,9 +1064,17 @@ internal static unsafe class FarmAutomation
         var completedSeedItem = selectedSeedItem;
         selectedSeedItem = 0;
         runKind = FarmRunKind.Water;
-        status = completedKind == FarmRunKind.HarvestAndSow ? "収穫→種まき完了" : "水やり完了";
+        status = completedKind switch
+        {
+            FarmRunKind.HarvestOnly => "収穫完了",
+            FarmRunKind.HarvestAndSow => "収穫→種まき完了",
+            _ => "水やり完了",
+        };
+
         if (completedKind == FarmRunKind.HarvestAndSow)
             PluginLog.Information($"[Farm] 収穫→種まき完了: {total}区画 SeedItem={completedSeedItem}");
+        else if (completedKind == FarmRunKind.HarvestOnly)
+            PluginLog.Information($"[Farm] 収穫完了: {total}区画");
         else
             PluginLog.Information($"[Farm] 水やり完了: {total}区画");
         RemoveUpdateHookIfIdle();
